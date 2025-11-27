@@ -68,7 +68,7 @@ function update!(stream_deltas, data)
     stream_deltas.brackets_opened == 0
 end
 mutable struct StreamDeltas
-    stream::HTTP.Stream
+    stream::Union{HTTP.Stream, Nothing}
     deltas::Vector{String}
     brackets_opened::Int
     commands_sent::Int
@@ -76,7 +76,7 @@ mutable struct StreamDeltas
     stop::Bool
 end
 
-CURRENT_STREAM_DELTAS = StreamDeltas(stream, [], 0, 0, false, false)
+CURRENT_STREAM_DELTAS = StreamDeltas(nothing, [], 0, 0, false, false)
 function intelligence(input)
     HTTP.open("POST", URL;
     headers=HEADERS,
@@ -87,7 +87,9 @@ function intelligence(input)
             global CURRENT_STREAM_DELTAS
             if CURRENT_STREAM_DELTAS.start
                 CURRENT_STREAM_DELTAS.stop = true
-                try HTTP.closeread(CURRENT_STREAM_DELTAS.stream) catch e @show e end
+                if !isnothing(CURRENT_STREAM_DELTAS.stream)
+                    try HTTP.closeread(CURRENT_STREAM_DELTAS.stream) catch e @show e end
+                end
             end
             CURRENT_STREAM_DELTAS = StreamDeltas(stream, [], 0, 0, true, false)
             body = prepare_body(input)
