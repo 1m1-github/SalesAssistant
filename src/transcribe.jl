@@ -55,14 +55,19 @@ transcribe_task = @async while TRANSCRIBING[]
     text = clean_whisper_text(text)
     @show "transcribe got text", text # DEBUG
     push!(text_buffer, text)
-    sentence_end_ix = sentence_end(text)
+    full_buffer = join(text_buffer, ' ')
+    sentence_end_ix = sentence_end(full_buffer)
     isnothing(sentence_end_ix) && continue
     timestamp = round(Int, time())
-    sentence = join(text_buffer, ' ')
-    empty!(text_buffer)
-    sentence = "<$timestamp>$SPEAKER: $sentence"
+    pre_punctuation = full_buffer[1:sentence_end_ix[1]]
+    sentence = "<$timestamp>$SPEAKER: $pre_punctuation"
     @show "transcribe got sentence", sentence # DEBUG
     push!(sentences, sentence)
+    empty!(text_buffer)
+    post_punctuation = full_buffer[sentence_end_ix[1]+1:end]
+    if !isempty(post_punctuation)
+        append!(text_buffer, split(post_punctuation, ' ', keepempty=false))
+    end
     conversation = join(sentences, '\n')
     write("conversation", conversation) # DEBUG
     put!(intelligence_channel, conversation)

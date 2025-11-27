@@ -1,7 +1,7 @@
-function stop()
-    # global LOOPING = false
-    LOOPING[] = false
-    wait(loop_task)
+function stop_all()
+    RECORDING[] = TRANSCRIBING[] = LOOPING[] = INTELLIGENCING[] = false
+    wait(audio_task, loop_task, transcribe_task, intelligence_task, http_task)
+    stop_virtual_dom(stdin_pipe, process)
 end
 
 LOOPING = Ref(true)
@@ -12,5 +12,6 @@ loop_task = @async while LOOPING[]
     put!(transcribe_channel, audio_buffer)
 end
 
+atexit(stop_all)
+
 # check(loop_task)
-# stop()

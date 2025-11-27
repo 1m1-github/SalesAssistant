@@ -39,27 +39,13 @@ function get_delta(line)
     chunk == "[DONE]" && return ""
     data = JSON3.read(chunk)
     @assert length(data["choices"]) == 1 # DEBUG
-    delta = get(data["choices"][1]["delta"], "content", "")
-    @show delta # DEBUG
-    delta
+    get(data["choices"][1]["delta"], "content", "")
 end
 
-# function remove_quotes(code, prepend)
-#     postpend = """```"""
-#     if startswith(code, prepend) && endswith(code, postpend)
-#         code = code[length(prepend) + 1:end-length(postpend)]
-#         code = strip(code)
-#     end
-#     code
-# end
-
 function send_command!(stream_deltas)
-    @show "send_command!"
     js_command = join(stream_deltas.deltas)
     @show "send_command!", js_command # DEBUG
-    write("js_command", js_command) # DEBUG
-    # code = remove_quotes(code, """```html""")
-    # code = remove_quotes(code, """```""")
+    open("js_command", js_command, "a") do f; write(f, js_command*'\n') end # DEBUG
     first_bracket_open_range = findfirst('{', js_command)
     isnothing(first_bracket_open_range) && return
     first_bracket_open = first_bracket_open_range[1]
@@ -67,7 +53,8 @@ function send_command!(stream_deltas)
     isnothing(last_bracket_close_range) && return
     last_bracket_close = last_bracket_close_range[1]
     js_command = js_command[first_bracket_open:last_bracket_close]
-    send_virtual_js(js_command) && send_js(js_command)
+    send_virtual_js(js_command)
+    send_js(js_command)
     stream_deltas.commands_sent +=1
     empty!(stream_deltas.deltas)
 end
@@ -92,9 +79,6 @@ CURRENT_STREAM_DELTAS = StreamDeltas(stream, [], 0, 0, false, false)
 function intelligence(input)
     HTTP.open("POST", URL;
     headers=HEADERS,
-    # readtimeout=1000,
-    # connect_timeout=30,
-    # verbose=true,
     decompressor=identity
     ) do stream
         try 
@@ -111,12 +95,12 @@ function intelligence(input)
             HTTP.startread(stream)
             buffered_stream = BufferedInputStream(stream)
             for data in eachline(buffered_stream)
-                # @show "intelligence got data"
                 update!(CURRENT_STREAM_DELTAS, data)
                 @assert 0 <= CURRENT_STREAM_DELTAS.brackets_opened # DEBUG
                 0 < CURRENT_STREAM_DELTAS.brackets_opened && continue
                 send_command!(CURRENT_STREAM_DELTAS)
             end
+            CURRENT_STREAM_DELTAS.start = false
         catch e @show e end
     end
 end
