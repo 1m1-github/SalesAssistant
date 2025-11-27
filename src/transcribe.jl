@@ -3,17 +3,18 @@
 @install Suppressor
 
 const SILENCE_THRESHOLD = 1e-6
-# const WHISPER_FILENAME = "ggml-large-v3.bin"
-const WHISPER_FILENAME = "ggml-base.en.bin"
-# const WHISPER_FILENAME = "ggml-small.en.bin"
-# const WHISPER_FILENAME = "ggml-tiny.en.bin"
+# const WHISPER_FILENAME = "llm/ggml-large-v3.bin"
+const WHISPER_FILENAME = "llm/ggml-base.en.bin"
+# const WHISPER_FILENAME = "llm/ggml-small.en.bin"
+# const WHISPER_FILENAME = "llm/ggml-tiny.en.bin"
 const WHISPER_CONTEXT = Whisper.whisper_init_from_file(WHISPER_FILENAME)
 const WHISPER_PARAMS = Whisper.whisper_full_default_params(Whisper.LibWhisper.WHISPER_SAMPLING_GREEDY)
+
 function transcribe(data)
     @suppress begin
         result = ""
         all(abs.(data) .< SILENCE_THRESHOLD) && return result
-        Whisper.whisper_full_parallel(WHISPER_CONTEXT, WHISPER_PARAMS, data, length(data), Threads.nthreads() - 1)
+        Whisper.whisper_full_parallel(WHISPER_CONTEXT, WHISPER_PARAMS, data, length(data), Threads.nthreads())
         n_segments = Whisper.whisper_full_n_segments(WHISPER_CONTEXT)
         for i in 0:n_segments-1
             txt = Whisper.whisper_full_get_segment_text(WHISPER_CONTEXT, i)
