@@ -16,9 +16,9 @@ RECORDING = Ref(true)
 audio_task = @async PortAudioStream(device, maximum, maximum, samplerate = FRAMES_PER_SECOND, frames_per_buffer = FRAMES_PER_BUFFER) do stream
     while RECORDING[]
         yield()
-        buffer = read(stream, TOKEN_DURATION)
-        @show "audio got buffer"
-        put!(audio_channel, buffer)
+        audio_buffer = read(stream, TOKEN_DURATION)
+        @show "got audio_buffer" # DEBUG
+        put!(audio_channel, audio_buffer)
     end
 end
 
@@ -27,3 +27,4 @@ end
 # @install FileIO
 # save("test.ogg", audio_buffer)
 # load("test.ogg")
+# stream=PortAudioStream(device, maximum, maximum, samplerate = FRAMES_PER_SECOND, frames_per_buffer = FRAMES_PER_BUFFER) ; audio_buffer = read(stream, TOKEN_DURATION)

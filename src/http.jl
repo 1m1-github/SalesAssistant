@@ -109,10 +109,23 @@ function serve_css(stream)
     return
 end
 
+function ignore_favicon_devtools(stream)
+    path = HTTP.requestpath(stream.message)
+    if endswith(path, "favicon.ico") || startswith(path, "/json") || startswith(path, "/devtools")
+        HTTP.setstatus(stream, 204)
+        HTTP.startwrite(stream)
+        return
+    end
+    HTTP.setstatus(stream, 404)
+    HTTP.startwrite(stream)
+    write(stream, "Not found")
+end
+
 const ROUTER = HTTP.Router()
 HTTP.register!(ROUTER, "GET", "/", serve)
 HTTP.register!(ROUTER, "GET", "/futurism-theme.css", serve_css)
 HTTP.register!(ROUTER, "/events", events)
+HTTP.register!(ROUTER, "GET", "/*", ignore_favicon_devtools)
 http_task = @async HTTP.serve!(ROUTER, "127.0.0.1", 8080; stream=true)
 
 # check(http_task)
