@@ -2,7 +2,7 @@ function send_virtual_js(stdin_pipe, js_code)
     old_dom = read("dom/dom.html", String)
     write(stdin_pipe, js_code * "\n")
     flush(stdin_pipe)
-    sleep(0.1)
+    sleep(0.1) # todo fix
     new_dom = read("dom/dom.html", String)
     @show old_dom != new_dom # DEBUG
     old_dom != new_dom

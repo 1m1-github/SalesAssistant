@@ -53,6 +53,7 @@ function events(stream)
         HTTP.setstatus(stream, 200)
         HTTP.setheader(stream, "Access-Control-Allow-Origin" => "*")
         HTTP.setheader(stream, "Access-Control-Allow-Methods" => "GET, OPTIONS")
+        HTTP.setheader(stream, "Access-Control-Allow-Headers" => "Content-Type")
         HTTP.startwrite(stream)
         return
     end

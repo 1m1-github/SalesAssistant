@@ -3,16 +3,6 @@
 @install BufferedStreams
 
 const X_AI_API_KEY = ENV["X_AI_API_KEY"]
-# const INPUT_SYSTEM = """show me good info about what i ask using a HTML/JAVASCRIPT, which will be inserted into a `div`, always make it artsy, colorful, interesting"""
-# const INPUT_SYSTEM = """
-#     You are a sales assistant that shows relevant info on the browser during a call without speaking.
-#     You send back javascript code only.
-#     Since you are streaming, send the js in smaller chunks inside curly brackets {}, which will be executed on the client as soon as a } hits.
-#     You will also see most of the DOM in the requests and the conversation and some context (company, product, etc.).
-#     And we want to close the sale during the call, to send a contract and ask for half upfront.
-#     Keep concise. I am on a sales phone call, meaning you should not write just long text, use HTML to allow me to see the most important information easily.
-#     tailwind is available in the client, use it to look nice.
-# """
 const INPUT_SYSTEM = """
     You are an assistant that shows relevant info on the browser during a call without speaking.
     You send back javascript code only. It allows you full granular control of the client browser.
@@ -28,16 +18,16 @@ const HEADERS = [
 ]
 
 function prepare_body(input_user)
-    input_user = "<body>" * read("dom/updated-dom.html", String) * "</body>" * input_user
+    input_user = "<body>" * read("dom/dom.html", String) * "</body>" * input_user
 
     messages = [Dict("role" => "system", "content" => INPUT_SYSTEM)]
     push!(messages, Dict("role" => "user", "content" => input_user))
     body = Dict(
         "model" => "grok-4-1-fast-reasoning",
-        # "model" => "grok-code-fast-1",
         "stream" => true,
         "messages" => messages,
         "temperature" => 0.2,
+        "max_tokens": 2^12
     )
     JSON3.write(body)
 end
@@ -83,12 +73,6 @@ function send_command!(stream_deltas)
 end
 
 function update!(stream_deltas, data)
-    # global CANCEL_OTHER_STREAM[]
-    if CANCEL_OTHER_STREAM[]
-        CANCEL_OTHER_STREAM[] = false
-        try HTTP.closeread(stream_deltas.stream) catch e @show e end
-        return
-    end
     delta = get_delta(data)
     isempty(delta) && return
     stream_deltas.brackets_opened += count(==('{'), delta)
@@ -100,9 +84,11 @@ mutable struct StreamDeltas
     deltas::Vector{String}
     brackets_opened::Int
     commands_sent::Int
+    start::Bool
+    stop::Bool
 end
-CANCEL_OTHER_STREAM = Ref(false)
 
+CURRENT_STREAM_DELTAS = StreamDeltas(stream, [], 0, 0, false, false)
 function intelligence(input)
     HTTP.open("POST", URL;
     headers=HEADERS,
@@ -113,7 +99,12 @@ function intelligence(input)
     ) do stream
         try 
             @show "intelligence got stream"
-            stream_deltas = StreamDeltas(stream, [], 0, 0)
+            global CURRENT_STREAM_DELTAS
+            if CURRENT_STREAM_DELTAS.start
+                CURRENT_STREAM_DELTAS.stop = true
+                try HTTP.closeread(CURRENT_STREAM_DELTAS.stream) catch e @show e end
+            end
+            CURRENT_STREAM_DELTAS = StreamDeltas(stream, [], 0, 0, true, false)
             body = prepare_body(input)
             write(stream, body)
             HTTP.closewrite(stream)
@@ -121,14 +112,10 @@ function intelligence(input)
             buffered_stream = BufferedInputStream(stream)
             for data in eachline(buffered_stream)
                 # @show "intelligence got data"
-                update!(stream_deltas, data)
-                @assert 0 <= stream_deltas.brackets_opened # DEBUG
-                0 < stream_deltas.brackets_opened && continue
-                send_command!(stream_deltas)
-                if stream_deltas.commands_sent == 1
-                    # global CANCEL_OTHER_STREAM[] = true
-                    CANCEL_OTHER_STREAM[] = true
-                end
+                update!(CURRENT_STREAM_DELTAS, data)
+                @assert 0 <= CURRENT_STREAM_DELTAS.brackets_opened # DEBUG
+                0 < CURRENT_STREAM_DELTAS.brackets_opened && continue
+                send_command!(CURRENT_STREAM_DELTAS)
             end
         catch e @show e end
     end

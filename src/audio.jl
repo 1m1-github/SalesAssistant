@@ -1,9 +1,9 @@
 @install PortAudio
 @install SampledSignals
 
-const TOKEN_DURATION = 5s
+const TOKEN_DURATION = 2s
 const FRAMES_PER_SECOND = 16000
-const FRAMES_PER_BUFFER = 128
+const FRAMES_PER_BUFFER = 2^8
 
 devices = PortAudio.devices()
 # device = only(filter(d -> d.name == "MacBook Air Microphone", devices))

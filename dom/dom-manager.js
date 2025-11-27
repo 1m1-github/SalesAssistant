@@ -29,15 +29,6 @@ function sanitizeDOM() {
   })
 }
 
-const html = fs.readFileSync('src/base.html', 'utf8')
-
-const dom = new JSDOM(html, {
-  runScripts: 'dangerously',
-  pretendToBeVisual: true,
-})
-const window = dom.window
-const document = window.document
-
 function executeJS(code) {
   try {
     window.eval(code)
@@ -61,22 +52,18 @@ function minifyHTML(htmlString) {
     .trim()
 }
 
-const readline = require('readline').createInterface({
-  input: process.stdin,
-  output: process.stdout
+const html = fs.readFileSync('src/base.html', 'utf8')
+const dom = new JSDOM(html, {
+  runScripts: 'dangerously',
+  pretendToBeVisual: true,
 })
+const window = dom.window
+const document = window.document
 
-function prompt() {
-  readline.question('> ', (input) => {
-    if (input.toLowerCase() === 'exit') {
-      readline.close()
-    } else {
-      executeJS(input)
-      saveDOMToFile()
-      prompt()
-    }
-  })
-}
-
-saveDOMToFile()
-prompt()
+process.stdin.setEncoding('utf8')
+process.stdin.on('data', (data) => {
+  const code = data.trim()
+  if (code === 'exit') process.exit(0)
+  executeJS(code)
+  saveDOMToFile()
+})
