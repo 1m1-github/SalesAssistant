@@ -65,6 +65,7 @@ function update!(stream_deltas, data)
     stream_deltas.brackets_opened += count(==('{'), delta)
     stream_deltas.brackets_opened -= count(==('}'), delta)
     push!(stream_deltas.deltas, delta)
+    stream_deltas.brackets_opened == 0
 end
 mutable struct StreamDeltas
     stream::HTTP.Stream
@@ -95,10 +96,9 @@ function intelligence(input)
             HTTP.startread(stream)
             buffered_stream = BufferedInputStream(stream)
             for data in eachline(buffered_stream)
-                update!(CURRENT_STREAM_DELTAS, data)
-                @assert 0 <= CURRENT_STREAM_DELTAS.brackets_opened # DEBUG
-                0 < CURRENT_STREAM_DELTAS.brackets_opened && continue
-                send_command!(CURRENT_STREAM_DELTAS)
+                if update!(CURRENT_STREAM_DELTAS, data)
+                    send_command!(CURRENT_STREAM_DELTAS)
+                end
             end
             CURRENT_STREAM_DELTAS.start = false
         catch e @show e end
