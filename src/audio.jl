@@ -1,12 +1,28 @@
 @install PortAudio
-devices = PortAudio.devices()
-device = only(filter(d -> d.name == "MacBook Air Microphone", devices))
-device = only(filter(d -> d.name == "USB Audio" && d.input_bounds.max_channels == 1 && d.output_bounds.max_channels == 0, devices))
+@install SampledSignals
 
-PortAudioStream(device, maximum, maximum, samplerate=16000) do stream # might need to adjust frames_per_buffer
-    const AUDIO_BUFFER_LENGTH = 2s
-    audio_buffer = read(stream, AUDIO_BUFFER_LENGTH)
+const TOKEN_DURATION = 5s
+const FRAMES_PER_SECOND = 16000
+const FRAMES_PER_BUFFER = 128
+
+devices = PortAudio.devices()
+# device = only(filter(d -> d.name == "MacBook Air Microphone", devices))
+device = only(filter(d -> d.name == "USB Audio" && d.input_bounds.max_channels == 1 && d.output_bounds.max_channels == 0, devices))
+@show device # DEBUG
+
+audio_channel = Channel{SampleBuf}()
+
+RECORDING = Ref(true)
+audio_task = @async PortAudioStream(device, maximum, maximum, samplerate = FRAMES_PER_SECOND, frames_per_buffer = FRAMES_PER_BUFFER) do stream
+    while RECORDING[]
+        yield()
+        buffer = read(stream, TOKEN_DURATION)
+        @show "audio got buffer"
+        put!(audio_channel, buffer)
+    end
 end
+
+# check(audio_task)
 
 # @install FileIO
 # save("test.ogg", audio_buffer)

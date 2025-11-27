@@ -1,7 +1,12 @@
-@install Whisper, Suppressor
+@install Whisper
+@install SampledSignals
+@install Suppressor
 
 const SILENCE_THRESHOLD = 1e-6
-const WHISPER_FILENAME = "ggml-large.en.bin"
+# const WHISPER_FILENAME = "ggml-large-v3.bin"
+# const WHISPER_FILENAME = "ggml-base.en.bin"
+# const WHISPER_FILENAME = "ggml-small.en.bin"
+const WHISPER_FILENAME = "ggml-tiny.en.bin"
 const WHISPER_CONTEXT = Whisper.whisper_init_from_file(WHISPER_FILENAME)
 const WHISPER_PARAMS = Whisper.whisper_full_default_params(Whisper.LibWhisper.WHISPER_SAMPLING_GREEDY)
 function transcribe(data)
@@ -21,14 +26,46 @@ end
 const RM_WHISPER_COMMENTS_PATTERN = r"\[.*?\]|\(.*?\)"
 function clean_whisper_text(x)
     x = replace(x, RM_WHISPER_COMMENTS_PATTERN => "")
+    if endswith(x, "...")
+        x = replace(x, "..." => " ")
+    end
     x = replace(x, "  " => " ")
     strip(x)
 end
 
-# test
-buffers = []
-PortAudioStream(device, maximum, maximum, samplerate=16000) do stream
-    buffer = read(stream)
-    push!(buffers, buffer)
+function sentence_end(text)
+    for punctuation in ['.', ',', ';', '!', '?', '\n']
+        index = findfirst(string(punctuation), text)
+        !isnothing(index) && return index[1]
+    end
+    nothing
 end
 
+const SPEAKER = "imi"
+
+transcribe_channel = Channel{SampleBuf}()
+text_buffer = []
+sentences = []
+TRANSCRIBING = Ref(true)
+transcribe_task = @async while TRANSCRIBING[]
+    yield()
+    audio_buffer = take!(transcribe_channel)
+    @show "transcribe got audio_buffer" # DEBUG
+    text = transcribe(audio_buffer.data)
+    text = clean_whisper_text(text)
+    @show "transcribe got text", text # DEBUG
+    push!(text_buffer, text)
+    sentence_end_ix = sentence_end(text)
+    isnothing(sentence_end_ix) && continue
+    timestamp = round(Int, time())
+    sentence = join(text_buffer, ' ')
+    empty!(text_buffer)
+    sentence = "<$timestamp>$SPEAKER: $sentence"
+    @show "transcribe got sentence", sentence # DEBUG
+    push!(sentences, sentence)
+    conversation = join(sentences, '\n')
+    write("conversation", conversation) # DEBUG
+    put!(intelligence_channel, conversation)
+end
+
+# check(transcribe_task)

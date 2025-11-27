@@ -3,32 +3,16 @@
 
 JS = ""
 send_js(js) = global JS = js
+add_js_to_html(html, js) = replace(html, "</body>" => "<script>$js</script></body>")
 
 const PING_EVENT = ":\n\n"
 const PING_DISTANCE = 10.0
 
-const BASE_HTML = """
-<!DOCTYPE html>
-<html>
-<head><title>Sales Assistant</title></head>
-<script src="https://cdn.tailwindcss.com"></script>
-<body>
-<div id='output'>aos></div>
-<script>
-    const eventSource = new EventSource('/events')
-    eventSource.onmessage = function(event) {
-        eval(event.data)
-    }
-    eventSource.onerror = function(event) {
-        console.error('SSE error event:', event)
-    }
-</script>
-</body>
-</html>
-"""
+const EVENT_SOURCE_JS = read("src/eventsource.js", String)
+const BASE_HTML = add_js_to_html(read("src/base.html", String), EVENT_SOURCE_JS)
 
 function serveClient(stream)
-    @show "serveClient", stream.message
+    @show "serveClient", HTTP.method(stream.message)
     if HTTP.method(stream.message) == "OPTIONS"
         HTTP.setstatus(stream, 200)
         HTTP.setheader(stream, "Access-Control-Allow-Origin" => "*")
@@ -42,24 +26,18 @@ function serveClient(stream)
     HTTP.setheader(stream, "Cache-Control" => "no-cache")
     HTTP.setheader(stream, "Access-Control-Allow-Origin" => "*")
 
-    @show "serveClient 1"
     HTTP.startwrite(stream)
-    @show "serveClient 2"
     write(stream, BASE_HTML)
-    @show "serveClient 3"
     return
 end
 
 function send_sse_html(stream, html)
-    @show "send_sse_html"
     lines = split(html, "\n")
     @show "send_sse_html", length(lines)
     for line in lines
         write(stream, "data: $(chomp(line))\n")
     end
-    @show "send_sse_html 2"
     write(stream, "\n")
-    @show "send_sse_html 3"
     flush(stream)
 end
 
