@@ -42,7 +42,7 @@ function saveDOMToFile() {
   let bodyHTML = document.body.innerHTML
   bodyHTML = minifyHTML(bodyHTML)
   fs.writeFileSync('dom/dom.html', bodyHTML, 'utf8')
-  fs.writeFileSync('tmp/dom-${Date.now()}.html', bodyHTML, 'utf8')
+  fs.writeFileSync(`tmp/dom-${Date.now()}.html`, bodyHTML, 'utf8')
 }
 
 function minifyHTML(htmlString) {

@@ -20,15 +20,20 @@ const HEADERS = [
 function prepare_body(input_user)
     dom_file = "dom/dom.html"
     dom = isfile(dom_file) ? read(dom_file, String) : ""
+    # global DOM_ERRORS
+    # errors = join(DOM_ERRORS, '\n')
+    # empty!(DOM_ERRORS)
+    # input_user = "<body>" * dom * "</body>\n<errors>" * errors * "</errors>\n" * input_user
     input_user = "<body>" * dom * "</body>" * input_user
     messages = [Dict("role" => "system", "content" => INPUT_SYSTEM)]
     push!(messages, Dict("role" => "user", "content" => input_user))
     body = Dict(
         "model" => "grok-4-1-fast-reasoning",
+        # "model" => "grok-code-fast-1",
         "stream" => true,
         "messages" => messages,
         "temperature" => 0.2,
-        "max_tokens" => 2^12,
+        # "max_tokens" => 2^12,
     )
     JSON3.write(body)
 end
@@ -53,7 +58,7 @@ function send_command!(stream_deltas)
     last_bracket_close = last_bracket_close_range[1]
     js_command = js_command[first_bracket_open:last_bracket_close]
     @show "send_command!", js_command # DEBUG
-    open("tmp/js_command-$(time())", "a") do f; write(f, js_command * "\n") end # DEBUG
+    write("tmp/js_command-$(time()).js", js_command) # DEBUG
     send_virtual_js(js_command)
     send_js(js_command)
     stream_deltas.commands_sent +=1
@@ -83,10 +88,11 @@ end
 CURRENT_STREAM_DELTAS = StreamDeltas(nothing, [], 0, 0, false, false)
 function intelligence(input)
     HTTP.open("POST", URL;
-    headers=HEADERS,
-    decompressor=identity
+        headers=HEADERS,
+        decompressor=identity,
+        reuse=false
     ) do stream
-        try 
+        try
             # @show "intelligence got stream"
             global CURRENT_STREAM_DELTAS
             if CURRENT_STREAM_DELTAS.start
@@ -97,6 +103,7 @@ function intelligence(input)
             end
             CURRENT_STREAM_DELTAS = StreamDeltas(stream, [], 0, 0, true, false)
             body = prepare_body(input)
+            write("tmp/body-$(time()).txt", body) # DEBUG
             write(stream, body)
             HTTP.closewrite(stream)
             HTTP.startread(stream)
