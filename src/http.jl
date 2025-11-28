@@ -48,7 +48,7 @@ function serve(stream)
 end
 
 function events(stream)
-    @show "events", HTTP.method(stream.message)
+    # @show "events", HTTP.method(stream.message)
     if HTTP.method(stream.message) == "OPTIONS"
         HTTP.setstatus(stream, 200)
         HTTP.setheader(stream, "Access-Control-Allow-Origin" => "*")
@@ -110,9 +110,17 @@ function serve_css(stream)
 end
 
 function ignore_favicon_devtools(stream)
-    path = HTTP.requestpath(stream.message)
-    if endswith(path, "favicon.ico") || startswith(path, "/json") || startswith(path, "/devtools")
-        HTTP.setstatus(stream, 204)
+    path = stream.message.url.path
+    if endswith(path, "favicon.ico") || startswith(path, "/.well-known") || startswith(path, "/json") || startswith(path, "/devtools")
+        if HTTP.method(stream.message) == "OPTIONS"
+            HTTP.setstatus(stream, 200)
+            HTTP.setheader(stream, "Access-Control-Allow-Origin" => "*")
+            HTTP.setheader(stream, "Access-Control-Allow-Methods" => "GET, OPTIONS")
+            HTTP.setheader(stream, "Access-Control-Allow-Headers" => "Content-Type")
+        else
+            HTTP.setstatus(stream, 204)
+        end
+        HTTP.setheader(stream, "Access-Control-Allow-Origin" => "*")
         HTTP.startwrite(stream)
         return
     end
@@ -125,7 +133,7 @@ const ROUTER = HTTP.Router()
 HTTP.register!(ROUTER, "GET", "/", serve)
 HTTP.register!(ROUTER, "GET", "/futurism-theme.css", serve_css)
 HTTP.register!(ROUTER, "/events", events)
-HTTP.register!(ROUTER, "GET", "/*", ignore_favicon_devtools)
+HTTP.register!(ROUTER, "GET", "/**", ignore_favicon_devtools)
 http_task = @async HTTP.serve!(ROUTER, "127.0.0.1", 8080; stream=true)
 
 # check(http_task)

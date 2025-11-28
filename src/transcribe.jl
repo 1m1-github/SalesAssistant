@@ -4,9 +4,9 @@
 
 const SILENCE_THRESHOLD = 1e-6
 # WHISPER_FILENAME = "llm/ggml-large-v3.bin"
-WHISPER_FILENAME = "llm/ggml-base.en.bin"
+# WHISPER_FILENAME = "llm/ggml-base.en.bin"
 # WHISPER_FILENAME = "llm/ggml-small.en.bin"
-# WHISPER_FILENAME = "llm/ggml-tiny.en.bin"
+WHISPER_FILENAME = "llm/ggml-tiny.en.bin"
 WHISPER_CONTEXT = Whisper.whisper_init_from_file(WHISPER_FILENAME)
 WHISPER_PARAMS = Whisper.whisper_full_default_params(Whisper.LibWhisper.WHISPER_SAMPLING_GREEDY)
 
@@ -51,10 +51,11 @@ TRANSCRIBING = Ref(true)
 transcribe_task = @async while TRANSCRIBING[]
     yield()
     audio_buffer = take!(transcribe_channel)
-    @show "transcribe got audio_buffer" # DEBUG
+    # @show "transcribe got audio_buffer" # DEBUG
     text = transcribe(audio_buffer.data)
+    # @show "transcribe got text", text # DEBUG
     text = clean_whisper_text(text)
-    @show "transcribe got text", text # DEBUG
+    # @show "transcribe cleaned text", text # DEBUG
     push!(text_buffer, text)
     full_buffer = join(text_buffer, ' ')
     sentence_end_ix = sentence_end(full_buffer)
@@ -70,7 +71,7 @@ transcribe_task = @async while TRANSCRIBING[]
         append!(text_buffer, split(post_punctuation, ' ', keepempty=false))
     end
     conversation = join(sentences, '\n')
-    write("conversation", conversation) # DEBUG
+    write("tmp/conversation", conversation) # DEBUG
     put!(intelligence_channel, conversation)
 end
 

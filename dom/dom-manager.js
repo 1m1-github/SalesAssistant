@@ -42,6 +42,7 @@ function saveDOMToFile() {
   let bodyHTML = document.body.innerHTML
   bodyHTML = minifyHTML(bodyHTML)
   fs.writeFileSync('dom/dom.html', bodyHTML, 'utf8')
+  fs.writeFileSync('tmp/dom-${Date.now()}.html', bodyHTML, 'utf8')
 }
 
 function minifyHTML(htmlString) {
@@ -59,6 +60,8 @@ const dom = new JSDOM(html, {
 })
 const window = dom.window
 const document = window.document
+
+saveDOMToFile()
 
 process.stdin.setEncoding('utf8')
 process.stdin.on('data', (data) => {

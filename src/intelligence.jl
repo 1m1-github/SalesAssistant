@@ -18,8 +18,9 @@ const HEADERS = [
 ]
 
 function prepare_body(input_user)
-    input_user = "<body>" * read("dom/dom.html", String) * "</body>" * input_user
-
+    dom_file = "dom/dom.html"
+    dom = isfile(dom_file) ? read(dom_file, String) : ""
+    input_user = "<body>" * dom * "</body>" * input_user
     messages = [Dict("role" => "system", "content" => INPUT_SYSTEM)]
     push!(messages, Dict("role" => "user", "content" => input_user))
     body = Dict(
@@ -27,45 +28,48 @@ function prepare_body(input_user)
         "stream" => true,
         "messages" => messages,
         "temperature" => 0.2,
-        "max_tokens": 2^12
+        "max_tokens" => 2^12,
     )
     JSON3.write(body)
 end
 
-function get_delta(line)
+function get_delta(data)
     GOOD_START = "data: "
-    !startswith(line, GOOD_START) && return ""
-    chunk = strip(line[length(GOOD_START):end])
+    !startswith(data, GOOD_START) && return ""
+    chunk = strip(data[length(GOOD_START):end])
     chunk == "[DONE]" && return ""
-    data = JSON3.read(chunk)
-    @assert length(data["choices"]) == 1 # DEBUG
-    get(data["choices"][1]["delta"], "content", "")
+    json = JSON3.read(chunk)
+    # @assert length(json["choices"]) == 1 # DEBUG
+    get(json["choices"][1]["delta"], "content", "")
 end
 
 function send_command!(stream_deltas)
     js_command = join(stream_deltas.deltas)
-    @show "send_command!", js_command # DEBUG
-    open("js_command", js_command, "a") do f; write(f, js_command*'\n') end # DEBUG
     first_bracket_open_range = findfirst('{', js_command)
-    isnothing(first_bracket_open_range) && return
+    isnothing(first_bracket_open_range) && return false
     first_bracket_open = first_bracket_open_range[1]
     last_bracket_close_range = findlast('}', js_command)
-    isnothing(last_bracket_close_range) && return
+    isnothing(last_bracket_close_range) && return false
     last_bracket_close = last_bracket_close_range[1]
     js_command = js_command[first_bracket_open:last_bracket_close]
+    @show "send_command!", js_command # DEBUG
+    open("tmp/js_command-$(time())", "a") do f; write(f, js_command * "\n") end # DEBUG
     send_virtual_js(js_command)
     send_js(js_command)
     stream_deltas.commands_sent +=1
     empty!(stream_deltas.deltas)
+    true
 end
 
 function update!(stream_deltas, data)
     delta = get_delta(data)
-    isempty(delta) && return
+    isempty(delta) && return false
     stream_deltas.brackets_opened += count(==('{'), delta)
-    stream_deltas.brackets_opened -= count(==('}'), delta)
+    brackets_closed = count(==('}'), delta)
+    stream_deltas.brackets_opened -= brackets_closed
+    stream_deltas.brackets_opened = max(0, stream_deltas.brackets_opened)
     push!(stream_deltas.deltas, delta)
-    stream_deltas.brackets_opened == 0
+    stream_deltas.brackets_opened == 0 && 0 < brackets_closed
 end
 mutable struct StreamDeltas
     stream::Union{HTTP.Stream, Nothing}
@@ -83,7 +87,7 @@ function intelligence(input)
     decompressor=identity
     ) do stream
         try 
-            @show "intelligence got stream"
+            # @show "intelligence got stream"
             global CURRENT_STREAM_DELTAS
             if CURRENT_STREAM_DELTAS.start
                 CURRENT_STREAM_DELTAS.stop = true
@@ -98,6 +102,7 @@ function intelligence(input)
             HTTP.startread(stream)
             buffered_stream = BufferedInputStream(stream)
             for data in eachline(buffered_stream)
+                # @show "intel data", data # DEBUG
                 if update!(CURRENT_STREAM_DELTAS, data)
                     send_command!(CURRENT_STREAM_DELTAS)
                 end
@@ -113,7 +118,7 @@ INTELLIGENCING = Ref(true)
 intelligence_task = @async while INTELLIGENCING[]
     yield()
     text = take!(intelligence_channel)
-    @show "intelligence got text", text
+    # @show "intelligence got text", text
     @async intelligence(text)
 end
 

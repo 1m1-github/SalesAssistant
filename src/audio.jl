@@ -1,5 +1,6 @@
 @install PortAudio
 @install SampledSignals
+# @install FileIO # DEBUG
 
 const TOKEN_DURATION = 2s
 const FRAMES_PER_SECOND = 16000
@@ -17,7 +18,8 @@ audio_task = @async PortAudioStream(device, maximum, maximum, samplerate = FRAME
     while RECORDING[]
         yield()
         audio_buffer = read(stream, TOKEN_DURATION)
-        @show "got audio_buffer" # DEBUG
+        # @show "got audio_buffer" # DEBUG
+        # save("tmp/audio_buffer-$(time()).ogg", audio_buffer) # DEBUG
         put!(audio_channel, audio_buffer)
     end
 end
